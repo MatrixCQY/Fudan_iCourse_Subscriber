@@ -266,3 +266,55 @@ button.agent-citation:hover, button.agent-citation:focus-visible { text-decorati
   font-size: .875rem;
 }
 .agent-settings .agent-remember { display: flex; align-items: center; gap: .4rem; }
+
+/* ── Dark theme ──
+   The markup uses plain Tailwind light utilities; instead of adding dark:
+   variants everywhere, remap the common ones under html.dark. */
+html.dark { color-scheme: dark; }
+html.dark body, html.dark .bg-gray-50 { background-color: #0f1115; }
+html.dark .bg-white { background-color: #171a21; }
+html.dark .bg-gray-100 { background-color: #1f232c; }
+html.dark .hover\:bg-gray-100:hover, html.dark .hover\:bg-gray-50:hover,
+html.dark .active\:bg-gray-50:active, html.dark .hover\:bg-gray-200:hover { background-color: #262b36; }
+html.dark .bg-blue-50 { background-color: rgba(59, 130, 246, .16); }
+html.dark .hover\:bg-blue-50:hover { background-color: rgba(59, 130, 246, .22); }
+html.dark .bg-red-50, html.dark .hover\:bg-red-50:hover { background-color: rgba(239, 68, 68, .15); }
+html.dark .text-gray-900, html.dark .text-gray-800 { color: #e5e7eb; }
+html.dark .text-gray-700 { color: #d1d5db; }
+html.dark .text-gray-600, html.dark .text-gray-500 { color: #9ca3af; }
+html.dark .text-gray-400 { color: #7b8494; }
+html.dark .text-gray-300 { color: #4b5563; }
+html.dark .hover\:text-gray-800:hover, html.dark .hover\:text-gray-900:hover { color: #f3f4f6; }
+html.dark .text-blue-600, html.dark .text-blue-700 { color: #60a5fa; }
+html.dark .border-gray-100, html.dark .border-gray-200, html.dark .border-gray-300 { border-color: #2a2f3a; }
+html.dark .shadow-sm { box-shadow: none; }
+html.dark .hover\:shadow-md:hover { box-shadow: 0 4px 14px rgba(0, 0, 0, .45); }
+html.dark input:not([type="checkbox"]):not([type="radio"]), html.dark textarea, html.dark select {
+  background-color: #11141a; color: #e5e7eb; border-color: #2a2f3a;
+}
+html.dark input::placeholder, html.dark textarea::placeholder { color: #6b7280; }
+/* term badge palette (bg-*-100 text-*-700) → translucent on dark */
+html.dark .bg-blue-100    { background-color: rgba(59, 130, 246, .2); }  html.dark .text-blue-700 { color: #93c5fd; }
+html.dark .bg-emerald-100 { background-color: rgba(16, 185, 129, .2); }  html.dark .text-emerald-700 { color: #6ee7b7; }
+html.dark .bg-purple-100  { background-color: rgba(168, 85, 247, .2); }  html.dark .text-purple-700 { color: #d8b4fe; }
+html.dark .bg-amber-100   { background-color: rgba(245, 158, 11, .2); }  html.dark .text-amber-700 { color: #fcd34d; }
+html.dark .bg-rose-100    { background-color: rgba(244, 63, 94, .2); }   html.dark .text-rose-700 { color: #fda4af; }
+html.dark .bg-cyan-100    { background-color: rgba(6, 182, 212, .2); }   html.dark .text-cyan-700 { color: #67e8f9; }
+html.dark .bg-orange-100  { background-color: rgba(249, 115, 22, .2); }  html.dark .text-orange-700 { color: #fdba74; }
+/* state badges */
+html.dark .badge-ready      { background: rgba(46, 125, 50, .25); color: #81c784; }
+html.dark .badge-processing { background: rgba(230, 81, 0, .22); color: #ffb74d; }
+html.dark .badge-waiting    { background: #1f232c; color: #9ca3af; }
+html.dark .badge-skipped    { background: #1a1e26; color: #6b7280; }
+html.dark .badge-failed     { background: rgba(198, 40, 40, .25); color: #ef9a9a; }
+/* reading view */
+html.dark .prose { color: #d1d5db; }
+html.dark .prose h1, html.dark .prose h2, html.dark .prose h3,
+html.dark .prose h4, html.dark .prose h5, html.dark .prose h6 { color: #e5e7eb; }
+html.dark .prose strong { color: #f87171; }
+html.dark .prose th { background: #1f232c; }
+html.dark .prose th, html.dark .prose td { border-color: #2a2f3a; }
+html.dark .prose pre { background: #11141a; border-color: #2a2f3a; }
+html.dark .prose p code, html.dark .prose li code { background: #1f232c; }
+html.dark .prose blockquote { background: #1a1e26; color: #a1a1aa; }
+html.dark .prose hr { border-top-color: #2a2f3a; }
