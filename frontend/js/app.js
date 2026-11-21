@@ -296,7 +296,7 @@ document.addEventListener("alpine:init", () => {
     subsSaving: false, subsError: "",
     subsLoading: false, subsStale: false,
     singleRunTriggering: false,
-    singleRunUseOfficial: false,
+    singleRunUseOfficial: true,
     /* Per-browser pinned-courses set, lazily synced to localStorage. */
     starred: _loadStarred(),
     theme: _initialTheme(),
