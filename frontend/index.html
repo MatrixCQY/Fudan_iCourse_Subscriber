@@ -322,6 +322,9 @@
           <input type="checkbox" x-model="courseIncompleteOnly" class="rounded">
           <span x-text="'只看未完成 (' + incompleteCourseCount + ')'"></span>
         </label>
+        <button type="button" x-show="courseSections.length > 0" @click="toggleAllSections()"
+                class="text-sm px-3 py-2 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-100"
+                x-text="allSectionsCollapsed ? '全部展开' : '全部折叠'"></button>
         <button type="button" x-show="courseGroupMode === 'custom'" @click="courseGroupsEditing = !courseGroupsEditing"
                 class="text-sm px-3 py-2 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-100"
                 x-text="courseGroupsEditing ? '完成' : '管理分组'"></button>
