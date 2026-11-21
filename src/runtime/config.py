@@ -27,6 +27,21 @@ USER_AGENT = (
 # 现的那条；这避免 Summarizer 内部按 name 索引 client 字典时被后写覆盖。
 MODEL_PROVIDERS: list[dict] = [
     {
+        # Claude via its OpenAI-compatible endpoint. Skipped when
+        # ANTHROPIC_API_KEY is unset, so the providers below still work.
+        "name": "claude",
+        "api_key_env": "ANTHROPIC_API_KEY",
+        "base_url_env": "ANTHROPIC_BASE_URL",
+        "default_base_url": "https://api.anthropic.com/v1/",
+        "models": [
+            "claude-sonnet-5-5",
+        ],
+        # Long notes (5000-8000 chars) plus default-on thinking on Claude 5
+        # need more output room and time than the 180s default.
+        "max_tokens": 32000,
+        "timeout": 900,
+    },
+    {
         "name": "modelscope",
         "api_key_env": "DASHSCOPE_API_KEY",
         "base_url_env": "DASHSCOPE_BASE_URL",
@@ -104,6 +119,8 @@ def resolve_model_providers() -> list[dict]:
             "api_key": api_key,
             "base_url": base_url,
             "models": list(p["models"]),
+            "max_tokens": p.get("max_tokens"),
+            "timeout": p.get("timeout", 180),
         }
         resolved.append(entry)
         by_name[p["name"]] = entry
