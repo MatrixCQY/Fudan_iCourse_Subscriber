@@ -561,6 +561,17 @@ document.addEventListener("alpine:init", () => {
       this.courseCollapsed = next;
       _saveJSON("courseCollapsed", next);
     },
+    get allSectionsCollapsed() {
+      var secs = this.courseSections;
+      return secs.length > 0 && secs.every((s) => !!this.courseCollapsed[s.key]);
+    },
+    toggleAllSections() {
+      var collapse = !this.allSectionsCollapsed;
+      var next = Object.assign({}, this.courseCollapsed);
+      this.courseSections.forEach(function (s) { next[s.key] = collapse; });
+      this.courseCollapsed = next;
+      _saveJSON("courseCollapsed", next);
+    },
     _saveCourseGroups() { _saveJSON("courseGroups", this.courseGroups); },
     addCourseGroup() {
       var name = this.newGroupName.trim();
