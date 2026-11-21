@@ -388,7 +388,7 @@ document.addEventListener("alpine:init", () => {
       if (view === "courses") {
         this.courses = this._sortCoursesByStar(ICS.db.getCoursesWithMeta());
       }
-      else if (view === "lectures" && params.courseId) {
+      else if ((view === "lectures" || view === "exam") && params.courseId) {
         this.currentCourse = this.courses.find(x => x.course_id === params.courseId) || { course_id: params.courseId, title: "...", teacher: "" };
         this.lectures = ICS.db.getLectures(params.courseId);
       }
@@ -635,6 +635,26 @@ document.addEventListener("alpine:init", () => {
 
     getExportableLectures() {
       return (this.lectures || []).filter((lec) => lec.summary && lec.summary.trim());
+    },
+    /* Per-course exam/notice digest: the 【课程事项与考试信息】 section of
+       every lecture summary (older summaries used 【课程事项提醒】). */
+    openExamSummary() {
+      if (this.currentCourse) this.navigate("exam", { courseId: this.currentCourse.course_id });
+    },
+    get examItems() {
+      var head = /^#{1,6}[ \t]*【(课程事项与考试信息|课程事项提醒)】[^\n]*\n?/m;
+      var out = [];
+      (this.lectures || []).forEach(function (l) {
+        var md = l.summary || "";
+        var m = head.exec(md);
+        if (!m) return;
+        var rest = md.slice(m.index + m[0].length);
+        var next = rest.search(/^#{1,3}[ \t]/m);
+        var body = (next >= 0 ? rest.slice(0, next) : rest).trim();
+        if (!body || /^本讲未提及/.test(body)) return;
+        out.push({ sub_id: l.sub_id, sub_title: l.sub_title, md: body });
+      });
+      return out;
     },
     openExportDialog() {
       const list = this.getExportableLectures();
