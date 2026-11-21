@@ -88,6 +88,18 @@ const _loadStarred = () => {
 const _saveStarred = (set) => localStorage.setItem(
   _LS + "starred", JSON.stringify(Array.from(set))
 );
+/* Courses-view preferences (theme, grouping) — per-browser localStorage. */
+const _loadJSON = (k, d) => {
+  try { const v = JSON.parse(localStorage.getItem(_LS + k)); return v == null ? d : v; }
+  catch { return d; }
+};
+const _saveJSON = (k, v) => { try { localStorage.setItem(_LS + k, JSON.stringify(v)); } catch {} };
+const _initialTheme = () => {
+  const t = _loadJSON("theme", null);
+  if (t === "dark" || t === "light") return t;
+  return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark" : "light";
+};
 
 function _relativeTime(iso) {
   if (!iso) return "";
@@ -287,8 +299,17 @@ document.addEventListener("alpine:init", () => {
     singleRunUseOfficial: false,
     /* Per-browser pinned-courses set, lazily synced to localStorage. */
     starred: _loadStarred(),
+    theme: _initialTheme(),
+    courseQuery: "",
+    courseIncompleteOnly: false,
+    courseGroupMode: _loadJSON("courseGroupMode", "custom"),
+    courseGroups: _loadJSON("courseGroups", []),
+    courseCollapsed: _loadJSON("courseCollapsed", {}),
+    courseGroupsEditing: false,
+    newGroupName: "",
 
     async init() {
+      this.applyTheme();
       this._loadAgent();
       const detected = ICS.github.detectRepo();
       const s = _loadSettings();
@@ -346,7 +367,7 @@ document.addEventListener("alpine:init", () => {
           );
         }
 
-        this.courses = this._sortCoursesByStar(ICS.db.getCourses());
+        this.courses = this._sortCoursesByStar(ICS.db.getCoursesWithMeta());
         this.view = "courses";
       } catch (e) {
         this.error = e.message;
@@ -365,7 +386,7 @@ document.addEventListener("alpine:init", () => {
       params = params || {};
       this.error = null;
       if (view === "courses") {
-        this.courses = this._sortCoursesByStar(ICS.db.getCourses());
+        this.courses = this._sortCoursesByStar(ICS.db.getCoursesWithMeta());
       }
       else if (view === "lectures" && params.courseId) {
         this.currentCourse = this.courses.find(x => x.course_id === params.courseId) || { course_id: params.courseId, title: "...", teacher: "" };
@@ -464,6 +485,126 @@ document.addEventListener("alpine:init", () => {
       _saveStarred(this.starred);
       // Reactive refresh — re-sort in place.
       this.courses = this._sortCoursesByStar(this.courses);
+    },
+
+    /* ── Theme (light / dark), persisted per browser ── */
+    applyTheme() {
+      document.documentElement.classList.toggle("dark", this.theme === "dark");
+    },
+    toggleTheme() {
+      this.theme = this.theme === "dark" ? "light" : "dark";
+      _saveJSON("theme", this.theme);
+      this.applyTheme();
+    },
+
+    /* ── Courses view: filter, grouping, progress ── */
+    setCourseGroupMode(mode) {
+      this.courseGroupMode = mode;
+      _saveJSON("courseGroupMode", mode);
+    },
+    isCourseIncomplete(c) {
+      return (c.pending_count || 0) > 0 || (c.failed_count || 0) > 0;
+    },
+    get incompleteCourseCount() {
+      return this.courses.filter((c) => this.isCourseIncomplete(c)).length;
+    },
+    _courseMatches(c) {
+      if (this.courseIncompleteOnly && !this.isCourseIncomplete(c)) return false;
+      var q = this.courseQuery.trim().toLowerCase();
+      if (!q) return true;
+      return [c.title, c.teacher, c.dept, c.term, c.course_id].some(function (v) {
+        return v != null && String(v).toLowerCase().includes(q);
+      });
+    },
+    get courseSections() {
+      var list = this.courses.filter((c) => this._courseMatches(c));
+      var mode = this.courseGroupMode;
+      if (mode === "term" || mode === "dept") {
+        var buckets = {};
+        list.forEach(function (c) {
+          var k = c[mode] || (mode === "term" ? "未知学期" : "未知院系");
+          (buckets[k] = buckets[k] || []).push(c);
+        });
+        var keys = Object.keys(buckets).sort();
+        if (mode === "term") keys.reverse();
+        return keys.map(function (k) {
+          return { key: mode + ":" + k, title: k, courses: buckets[k] };
+        });
+      }
+      if (mode !== "custom" || !this.courseGroups.length) {
+        return list.length ? [{ key: "all", title: "全部课程", courses: list }] : [];
+      }
+      var filtering = !!this.courseQuery.trim() || this.courseIncompleteOnly;
+      var assigned = {};
+      var sections = this.courseGroups.map(function (g) {
+        var ids = new Set(g.ids.map(String));
+        var cs = list.filter(function (c) {
+          var cid = String(c.course_id);
+          if (!ids.has(cid) || assigned[cid]) return false;
+          assigned[cid] = true;
+          return true;
+        });
+        return { key: "g:" + g.id, title: g.name, courses: cs, groupId: g.id };
+      });
+      sections.push({
+        key: "g:_ungrouped", title: "未分组",
+        courses: list.filter(function (c) { return !assigned[String(c.course_id)]; }),
+      });
+      return sections.filter(function (s) {
+        return s.courses.length || (s.groupId && !filtering);
+      });
+    },
+    isSectionCollapsed(key) { return !!this.courseCollapsed[key]; },
+    toggleSection(key) {
+      var next = Object.assign({}, this.courseCollapsed);
+      next[key] = !next[key];
+      this.courseCollapsed = next;
+      _saveJSON("courseCollapsed", next);
+    },
+    _saveCourseGroups() { _saveJSON("courseGroups", this.courseGroups); },
+    addCourseGroup() {
+      var name = this.newGroupName.trim();
+      if (!name) return;
+      this.courseGroups = this.courseGroups.concat([
+        { id: Date.now().toString(36), name: name, ids: [] },
+      ]);
+      this.newGroupName = "";
+      this._saveCourseGroups();
+    },
+    renameCourseGroup(id, name) {
+      name = String(name || "").trim();
+      if (!name) return;
+      this.courseGroups = this.courseGroups.map(function (g) {
+        return g.id === id ? Object.assign({}, g, { name: name }) : g;
+      });
+      this._saveCourseGroups();
+    },
+    deleteCourseGroup(id) {
+      this.courseGroups = this.courseGroups.filter(function (g) { return g.id !== id; });
+      this._saveCourseGroups();
+    },
+    moveCourseGroup(id, dir) {
+      var gs = this.courseGroups.slice();
+      var i = gs.findIndex(function (g) { return g.id === id; });
+      var j = i + dir;
+      if (i < 0 || j < 0 || j >= gs.length) return;
+      var t = gs[i]; gs[i] = gs[j]; gs[j] = t;
+      this.courseGroups = gs;
+      this._saveCourseGroups();
+    },
+    courseGroupOf(courseId) {
+      var cid = String(courseId);
+      var g = this.courseGroups.find(function (g) { return g.ids.map(String).includes(cid); });
+      return g ? g.id : "";
+    },
+    setCourseGroup(courseId, groupId) {
+      var cid = String(courseId);
+      this.courseGroups = this.courseGroups.map(function (g) {
+        var ids = g.ids.map(String).filter(function (x) { return x !== cid; });
+        if (g.id === groupId) ids.push(cid);
+        return Object.assign({}, g, { ids: ids });
+      });
+      this._saveCourseGroups();
     },
 
     /* Three-state detail viewer.  The button shown to the user always
