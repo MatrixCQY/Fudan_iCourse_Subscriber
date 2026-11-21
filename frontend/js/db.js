@@ -176,6 +176,30 @@ function _getCourses(db = _db) {
   `, [], db);
 }
 
+// Courses-view rows: same as _getCourses plus catalog metadata (latest term /
+// dept from all_courses) and per-state lecture counts for progress badges.
+// Kept separate from _getCourses so other callers (agent reader) are unaffected.
+function _getCoursesWithMeta(db = _db) {
+  return _queryAll(`
+    SELECT c.course_id AS course_id, c.title AS title, c.teacher AS teacher,
+           (SELECT a.term FROM all_courses a WHERE a.course_id = c.course_id
+             ORDER BY a.term DESC LIMIT 1) AS term,
+           (SELECT a.dept FROM all_courses a WHERE a.course_id = c.course_id
+             ORDER BY a.term DESC LIMIT 1) AS dept,
+           COUNT(CASE WHEN l.summary IS NOT NULL THEN 1 END) AS summary_count,
+           COUNT(l.sub_id) AS total_count,
+           COUNT(CASE WHEN l.error_stage IS NOT NULL
+                       AND l.error_stage <> 'no_video' THEN 1 END) AS failed_count,
+           COUNT(CASE WHEN l.sub_id IS NOT NULL AND l.error_stage IS NULL
+                       AND l.processed_at IS NULL THEN 1 END) AS pending_count,
+           MAX(l.processed_at) AS last_updated
+    FROM courses c
+    LEFT JOIN lectures l ON c.course_id = l.course_id
+    GROUP BY c.course_id
+    ORDER BY last_updated DESC NULLS LAST, c.course_id
+  `, [], db);
+}
+
 // Sort key parsed straight from sub_title — we deliberately do NOT trust the
 // `date` column. `date` is itself just substr(sub_title,1,10) on the backend
 // and is inconsistently back-filled: unprocessed lectures often ship with an
@@ -524,6 +548,7 @@ window.ICS.db = {
   attachShard: _attachShard,
   exportDB: _exportDB,
   getCourses: _getCourses,
+  getCoursesWithMeta: _getCoursesWithMeta,
   getLectures: _getLectures,
   getLecture: _getLecture,
   getPptPages: _getPptPages,
