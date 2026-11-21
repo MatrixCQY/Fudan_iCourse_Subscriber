@@ -89,8 +89,10 @@ class Summarizer:
         }
 
     def _call_llm(self, client: OpenAI, model: str,
-                  title: str, content: str) -> str:
+                  title: str, content: str,
+                  max_tokens: int | None = None, timeout: int = 180) -> str:
         t0 = time.time()
+        extra = {"max_tokens": max_tokens} if max_tokens else {}
         response = client.chat.completions.create(
             model=model,
             messages=[
@@ -103,7 +105,8 @@ class Summarizer:
                 },
             ],
             # temperature=0.3,
-            timeout=180,
+            timeout=timeout,
+            **extra,
         )
         if not response.choices:
             raise ValueError("API returned empty choices — likely content filter or quota exceeded")
@@ -147,7 +150,11 @@ class Summarizer:
             for model in provider["models"]:
                 model_id = f"{provider['name']}/{model}"
                 try:
-                    result = self._call_llm(client, model, title, content)
+                    result = self._call_llm(
+                        client, model, title, content,
+                        max_tokens=provider.get("max_tokens"),
+                        timeout=provider.get("timeout") or 180,
+                    )
                     return (result, model_id)
                 except Exception as e:
                     print(f"[Summarizer] {model_id} failed: "
