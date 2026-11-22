@@ -13,10 +13,14 @@ on:
         default: false
         type: boolean
       resummarize:
-        description: "Regenerate summaries for these courses (keeps transcripts and PPT text; old summaries are replaced)"
+        description: "Regenerate summaries (keeps transcripts and PPT text). all = every lecture of these courses; old_claude = only Claude summaries not yet in the new three-section format"
         required: false
-        default: false
-        type: boolean
+        default: none
+        type: choice
+        options:
+          - none
+          - all
+          - old_claude
 
 permissions:
   contents: write
@@ -162,9 +166,10 @@ jobs:
           fi
 
       - name: Clear summaries for re-summarization
-        if: inputs.resummarize && hashFiles('data/icourse.db') != ''
+        if: inputs.resummarize != 'none' && hashFiles('data/icourse.db') != ''
         env:
           COURSE_IDS_INPUT: ${{ inputs.course_ids }}
+          RESUMMARIZE_SCOPE: ${{ inputs.resummarize }}
         run: |
           python - <<'PY'
           import os, sqlite3
@@ -174,6 +179,11 @@ jobs:
               raise SystemExit(0)
           conn = sqlite3.connect("data/icourse.db")
           marks = ",".join("?" * len(ids))
+          scope = os.environ.get("RESUMMARIZE_SCOPE", "all")
+          extra = ""
+          if scope == "old_claude":
+              extra = (" AND summary_model LIKE 'claude/%'"
+                       " AND summary NOT LIKE '### 【课程事项与考试信息】%'")
           # Only lectures with a saved transcript: they can be re-summarized
           # without touching the video. Transcripts and ppt_pages are kept.
           cur = conn.execute(
@@ -181,11 +191,11 @@ jobs:
               " processed_at = NULL, emailed_at = NULL, error_msg = NULL,"
               " error_stage = NULL, error_count = 0"
               f" WHERE course_id IN ({marks})"
-              " AND transcript IS NOT NULL AND transcript != ''",
+              " AND transcript IS NOT NULL AND transcript != ''" + extra,
               ids,
           )
           conn.commit()
-          print(f"Cleared summaries of {cur.rowcount} lecture(s) with saved transcripts in {ids}")
+          print(f"[{scope}] Cleared summaries of {cur.rowcount} lecture(s) with saved transcripts in {ids}")
           PY
 
       - name: Run
