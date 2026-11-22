@@ -101,9 +101,18 @@ const _initialTheme = () => {
     ? "dark" : "light";
 };
 
+// processed_at & co. are written by the CI runner via datetime.now().isoformat():
+// UTC with no offset. new Date() would read that as browser-local time (8h off
+// in China), so offset-less ISO timestamps are treated as UTC here.
+function _parseRunnerTime(iso) {
+  let s = String(iso);
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s) && !/(Z|[+-]\d{2}:?\d{2})$/.test(s)) s += "Z";
+  return new Date(s);
+}
+
 function _relativeTime(iso) {
   if (!iso) return "";
-  const d = Date.now() - new Date(iso).getTime();
+  const d = Date.now() - _parseRunnerTime(iso).getTime();
   const m = Math.floor(d / 60000);
   if (m < 1) return "just now";
   if (m < 60) return m + "m ago";
@@ -111,7 +120,7 @@ function _relativeTime(iso) {
   if (h < 24) return h + "h ago";
   const days = Math.floor(h / 24);
   if (days < 30) return days + "d ago";
-  return new Date(iso).toLocaleDateString();
+  return _parseRunnerTime(iso).toLocaleDateString();
 }
 
 function _highlightSnippet(text, query, radius) {
@@ -1240,5 +1249,41 @@ document.addEventListener("alpine:init", () => {
     snippet(s, n) { return ICS.render.plainSnippet(s, n); },
     highlight(text, q) { return _highlightSnippet(text, q); },
     relTime(s) { return _relativeTime(s); },
+    fmtTime(s) {
+      if (!s) return "";
+      const d = _parseRunnerTime(s);
+      const p = (n) => String(n).padStart(2, "0");
+      return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate())
+        + " " + p(d.getHours()) + ":" + p(d.getMinutes());
+    },
+    modelLabel(m) { return m ? String(m).split("/").pop() : ""; },
+    /* Course page header: which models wrote the summaries, when the course
+       started (first lecture date in sub_title), when processing started and
+       when it was last updated (processed_at). */
+    get courseInfo() {
+      const models = {};
+      let firstLecture = null, firstProcessed = null, lastUpdated = null, ready = 0;
+      (this.lectures || []).forEach((l) => {
+        if (l.summary_model) {
+          const m = this.modelLabel(l.summary_model);
+          models[m] = (models[m] || 0) + 1;
+        }
+        if (l.state === "ready") ready++;
+        const dm = String(l.sub_title || "").match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+        if (dm) {
+          const d = dm[1] + "-" + dm[2].padStart(2, "0") + "-" + dm[3].padStart(2, "0");
+          if (!firstLecture || d < firstLecture) firstLecture = d;
+        }
+        if (l.processed_at) {
+          if (!firstProcessed || l.processed_at < firstProcessed) firstProcessed = l.processed_at;
+          if (!lastUpdated || l.processed_at > lastUpdated) lastUpdated = l.processed_at;
+        }
+      });
+      return {
+        models: Object.entries(models).sort((x, y) => y[1] - x[1]),
+        firstLecture, firstProcessed, lastUpdated, ready,
+        total: (this.lectures || []).length,
+      };
+    },
   }));
 });
