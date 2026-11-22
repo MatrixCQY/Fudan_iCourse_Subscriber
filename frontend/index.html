@@ -436,6 +436,26 @@
   <div x-show="view === 'lectures'" class="view-enter max-w-2xl mx-auto p-4">
     <p x-show="currentCourse?.teacher" class="text-sm text-gray-500 mb-3" x-text="currentCourse?.teacher"></p>
 
+    <!-- Course info: models, start, last update, progress -->
+    <div x-show="lectures.length > 0"
+         class="bg-white rounded-lg border border-gray-100 px-3.5 py-2.5 mb-3 text-xs text-gray-600 grid grid-cols-[4.5rem_1fr] gap-x-2 gap-y-1.5 items-center">
+      <span class="text-gray-400">参与模型</span>
+      <span class="flex flex-wrap gap-1">
+        <template x-for="m in courseInfo.models" :key="m[0]">
+          <span class="px-1.5 rounded bg-gray-100 font-mono" x-text="m[0] + ' ×' + m[1]"></span>
+        </template>
+        <span x-show="courseInfo.models.length === 0" class="text-gray-400">—</span>
+      </span>
+      <span class="text-gray-400">开课时间</span>
+      <span x-text="courseInfo.firstLecture ? courseInfo.firstLecture + '（第一讲）' : '—'"></span>
+      <span class="text-gray-400">开始处理</span>
+      <span x-text="courseInfo.firstProcessed ? fmtTime(courseInfo.firstProcessed) : '—'"></span>
+      <span class="text-gray-400">最近更新</span>
+      <span x-text="courseInfo.lastUpdated ? fmtTime(courseInfo.lastUpdated) + '（' + relTime(courseInfo.lastUpdated) + '）' : '—'"></span>
+      <span class="text-gray-400">进度</span>
+      <span x-text="courseInfo.ready + ' / ' + courseInfo.total + ' 讲已生成讲义'"></span>
+    </div>
+
     <div x-show="lectures.length === 0" class="text-center py-16 text-gray-400">
       <p>No lectures recorded yet.</p>
     </div>
@@ -447,6 +467,9 @@
                 class="w-full text-left bg-white rounded-lg border border-gray-100 p-3.5 transition-shadow">
           <div class="flex items-center justify-between gap-2">
             <h4 class="font-medium text-gray-800 text-sm truncate" x-text="lec.sub_title || 'Untitled'"></h4>
+            <span x-show="lec.summary_model" class="ml-auto flex-shrink-0 text-[10px] text-gray-400 font-mono"
+                  :title="lec.processed_at ? '生成于 ' + fmtTime(lec.processed_at) : ''"
+                  x-text="modelLabel(lec.summary_model)"></span>
             <span class="flex-shrink-0 text-xs px-2 py-0.5 rounded-full"
                   :class="{
                     'badge-ready': lec.state === 'ready',
