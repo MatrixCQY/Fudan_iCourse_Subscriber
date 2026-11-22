@@ -84,15 +84,38 @@ def merge(local_path: str, remote_path: str):
             """)
 
             # 3) Lectures: merge existing rows (progress forward only)
-            #    - Progress fields: COALESCE(local, remote) — prefer non-null
+            #    - transcript: COALESCE(local, remote) — prefer non-null
+            #    - summary / summary_model / processed_at / emailed_at move
+            #      together and the side with the newer processed_at wins.
+            #      Plain COALESCE(local, remote) let a long-running run that
+            #      loaded the DB hours earlier overwrite summaries another run
+            #      had regenerated in the meantime (its stale local copy still
+            #      held the old summary).
             #    - Error fields: clear if processed, otherwise keep the most info
-            conn.execute("""
+            local_newer = (
+                "(l.processed_at IS NOT NULL AND (main.lectures.processed_at IS NULL"
+                " OR l.processed_at > main.lectures.processed_at))"
+            )
+
+            def pick(col):
+                return (
+                    f"CASE WHEN {local_newer}"
+                    f" THEN COALESCE(l.{col}, main.lectures.{col})"
+                    f" ELSE COALESCE(main.lectures.{col}, l.{col}) END"
+                )
+
+            conn.execute(f"""
                 UPDATE main.lectures SET
-                    transcript    = COALESCE(l.transcript,    main.lectures.transcript),
-                    summary       = COALESCE(l.summary,       main.lectures.summary),
-                    summary_model = COALESCE(l.summary_model, main.lectures.summary_model),
-                    processed_at  = COALESCE(l.processed_at,  main.lectures.processed_at),
-                    emailed_at    = COALESCE(l.emailed_at,    main.lectures.emailed_at),
+                    transcript    = COALESCE(l.transcript, main.lectures.transcript),
+                    summary       = {pick("summary")},
+                    summary_model = {pick("summary_model")},
+                    processed_at  = {pick("processed_at")},
+                    emailed_at    = CASE
+                        WHEN {local_newer} THEN l.emailed_at
+                        WHEN l.processed_at = main.lectures.processed_at
+                        THEN COALESCE(l.emailed_at, main.lectures.emailed_at)
+                        ELSE main.lectures.emailed_at
+                    END,
                     error_msg = CASE
                         WHEN COALESCE(l.processed_at, main.lectures.processed_at) IS NOT NULL
                         THEN NULL
