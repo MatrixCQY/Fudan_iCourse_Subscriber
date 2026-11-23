@@ -13,7 +13,7 @@ on:
         default: false
         type: boolean
       resummarize:
-        description: "Regenerate summaries (keeps transcripts and PPT text). all = every lecture of these courses; old_claude = only Claude summaries not yet in the new three-section format"
+        description: "Regenerate summaries (keeps transcripts and PPT text). all = every lecture of these courses; old_claude = only Claude summaries not yet in the new three-section format; retry_failed = reset failure counters of lectures without a summary so they are retried"
         required: false
         default: none
         type: choice
@@ -21,6 +21,7 @@ on:
           - none
           - all
           - old_claude
+          - retry_failed
 
 permissions:
   contents: write
@@ -180,6 +181,16 @@ jobs:
           conn = sqlite3.connect("data/icourse.db")
           marks = ",".join("?" * len(ids))
           scope = os.environ.get("RESUMMARIZE_SCOPE", "all")
+          if scope == "retry_failed":
+              cur = conn.execute(
+                  "UPDATE lectures SET error_msg = NULL, error_stage = NULL, error_count = 0"
+                  f" WHERE course_id IN ({marks})"
+                  " AND processed_at IS NULL AND (summary IS NULL OR summary = '')",
+                  ids,
+              )
+              conn.commit()
+              print(f"[retry_failed] Reset failure counters of {cur.rowcount} lecture(s) in {ids}")
+              raise SystemExit(0)
           extra = ""
           if scope == "old_claude":
               extra = (" AND summary_model LIKE 'claude/%'"
