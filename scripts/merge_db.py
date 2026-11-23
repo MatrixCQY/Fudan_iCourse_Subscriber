@@ -124,7 +124,8 @@ def merge(local_path: str, remote_path: str):
                     error_count = CASE
                         WHEN COALESCE(l.processed_at, main.lectures.processed_at) IS NOT NULL
                         THEN 0
-                        ELSE MAX(COALESCE(l.error_count, 0), COALESCE(main.lectures.error_count, 0))
+                        -- local wins so a reset (Single Run retry_failed) survives the merge
+                        ELSE COALESCE(l.error_count, main.lectures.error_count, 0)
                     END,
                     error_stage = CASE
                         WHEN COALESCE(l.processed_at, main.lectures.processed_at) IS NOT NULL
